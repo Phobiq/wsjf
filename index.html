@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WSJF Live Voting App – Fixed Results Table</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f7f9fc; }
+  h1 { text-align: center; color: #2c3e50; }
+  .container { max-width: 1100px; margin: auto; }
+  .controls { text-align: center; margin: 20px 0; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+  button { padding: 10px 20px; margin: 5px; font-size: 16px; cursor: pointer; }
+  .big-btn { padding: 15px 30px; font-size: 20px; background:#e74c3c; color:white; border:none; border-radius:6px; }
+  .big-btn.active { background:#27ae60; }
+  #itemDisplay { font-size: 28px; font-weight: bold; text-align: center; margin: 30px; min-height: 80px; color:#2c3e50; }
+  .fib { font-size: 48px; padding: 20px; margin: 10px; cursor: pointer; border: 3px solid #3498db; border-radius: 12px; display: inline-block; width: 90px; text-align: center; background: white; user-select:none; }
+  .fib.selected { background: #3498db; color: white; }
+  .fib.revealed { border-color: #27ae60; background: #ecf0f1; }
+  .vote { font-size: 24px; margin: 10px; padding: 10px; display: inline-block; background:#ecf0f1; border-radius:6px; }
+  #results { margin-top: 30px; font-size: 22px; text-align: center; }
+  .median { font-size: 60px; font-weight: bold; color: #27ae60; }
+  table { width: 100%; margin-top: 20px; border-collapse: collapse; background: white; }
+  th, td { padding: 12px; text-align: center; border: 1px solid #ddd; }
+  th { background: #2c3e50; color: white; }
+  .done { background:#d5f5e3; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>WSJF Live Voting – Cost of Delay</h1>
+
+  <div class="controls">
+    <select id="round">
+      <option value="Business Value">1. User-Business Value</option>
+      <option value="Time Criticality">2. Time Criticality</option>
+      <option value="RR/OE">3. RR/OE Value</option>
+    </select>
+
+    <button class="big-btn" id="nextBtn" onclick="nextItem()">Start / Next Item</button>
+    <button class="big-btn" id="revealBtn" onclick="reveal()" disabled>Reveal Votes</button>
+    <button onclick="resetAll()">Reset Everything</button>
+  </div>
+
+  <div id="itemDisplay">Click “Start / Next Item” to begin</div>
+
+  <div style="text-align:center; margin:30px;">
+    <div class="fib" data-val="1">1</div>
+    <div class="fib" data-val="2">2</div>
+    <div class="fib" data-val="3">3</div>
+    <div class="fib" data-val="5">5</div>
+    <div class="fib" data-val="8">8</div>
+    <div class="fib" data-val="13">13</div>
+  </div>
+
+  <div id="currentVotes" style="text-align:center; min-height:60px;"></div>
+  <div id="results"></div>
+
+  <h2 style="text-align:center;">Results Table</h2>
+  <table id="resultsTable">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Business Value</th>
+        <th>Time Criticality</th>
+        <th>RR/OE</th>
+        <th>Cost of Delay (sum)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+// ==== EDIT YOUR BACKLOG HERE ====
+const backlog = [
+  "Login with SSO",
+  "Mobile responsive dashboard",
+  "Payment gateway integration",
+  "Real-time notifications",
+  "Export to PDF/Excel",
+  "Multi-language support",
+  "Audit log for compliance",
+  "Performance optimisations",
+  "Dark mode",
+  "Bulk user import",
+  "Advanced search & filters",
+  "API rate-limiting"
+];
+// ================================
+
+let currentItemIndex = -1;
+let votes = {};
+let results = {};
+
+// Load previous results (if you refreshed the page)
+if (localStorage.getItem('wsjfResults2025')) {
+  results = JSON.parse(localStorage.getItem('wsjfResults2025'));
+}
+renderTable();
+
+function nextItem() {
+  currentItemIndex++;
+  if (currentItemIndex >= backlog.length) {
+    alert("All items completed! Table is final.");
+    return;
+  }
+  resetRound();
+  document.getElementById('itemDisplay').textContent = 
+    `Item ${currentItemIndex+1} of ${backlog.length}:  ${backlog[currentItemIndex]}`;
+  document.getElementById('revealBtn').disabled = false;
+}
+
+function resetRound() {
+  votes = {};
+  document.getElementById('currentVotes').innerHTML = '';
+  document.getElementById('results').innerHTML = '';
+  document.querySelectorAll('.fib').forEach(el => {
+    el.classList.remove('selected','revealed');
+  });
+}
+
+// Click on Fibonacci cards
+document.querySelectorAll('.fib').forEach(card => {
+  card.addEventListener('click', function() {
+    if (document.getElementById('revealBtn').disabled) return;
+    
+    const val = parseInt(this.dataset.val);
+    const name = prompt("Your name (quick!)", "Me") || "Anon";
+    votes[name] = val;
+    
+    // Visual feedback
+    document.querySelectorAll('.fib').forEach(c => c.classList.remove('selected'));
+    this.classList.add('selected');
+    
+    // Show live votes
+    let html = "<strong>Votes so far:</strong> ";
+    for (const [n,v] of Object.entries(votes)) {
+      html += `<span class="vote">${n}: ${v}</span> `;
+    }
+    document.getElementById('currentVotes').innerHTML = html;
+  });
+});
+
+function reveal() {
+  if (Object.keys(votes).length === 0) return;
+
+  const values = Object.values(votes).sort((a,b)=>a-b);
+  const mid = Math.floor(values.length / 2);
+  const median = values.length % 2 === 0 
+                 ? Math.round((values[mid-1] + values[mid])/2)
+                 : values[mid];
+
+  document.getElementById('results').innerHTML = `
+    <h2>Median = <span class="median">${median}</span></h2>
+    <p>Votes: ${values.join(', ')}</p>
+    <button onclick="saveResult(${median})" style="padding:15px 40px; font-size:20px; background:#27ae60; color:white; border:none; border-radius:8px;">
+      Confirm & Save ${median}
+    </button>
+  `;
+
+  document.querySelectorAll('.fib').forEach(c => c.classList.add('revealed'));
+  document.getElementById('revealBtn').disabled = true;
+}
+
+function saveResult(score) {
+  const item = backlog[currentItemIndex];
+  const round = document.getElementById('round').value;
+
+  if (!results[item]) results[item] = {};
+
+  if (round === "Business Value") results[item].bv = score;
+  if (round === "Time Criticality") results[item].tc = score;
+  if (round === "RR/OE") results[item].rroe = score;
+
+  // Auto-calculate Cost of Delay
+  const sum = (results[item].bv || 0) + (results[item].tc || 0) + (results[item].rroe || 0);
+  results[item].cod = sum;
+
+  // Persist + refresh table
+  localStorage.setItem('wsjfResults2025', JSON.stringify(results));
+  renderTable();
+  
+  setTimeout(nextItem, 800);  // auto-advance after save
+}
+
+function renderTable() {
+  const tbody = document.querySelector('#resultsTable tbody');
+  tbody.innerHTML = '';
+  backlog.forEach(item => {
+    const r = results[item] || {};
+    const rowClass = (r.bv && r.tc && r.rroe) ? 'done' : '';
+    tbody.innerHTML += `
+      <tr class="${rowClass}">
+        <td><strong>${item}</strong></td>
+        <td>${r.bv || '-'}</td>
+        <td>${r.tc || '-'}</td>
+        <td>${r.rroe || '-'}</td>
+        <td><strong>${r.cod > 0 ? r.cod : '-'}</strong></td>
+      </tr>`;
+  });
+}
+
+function resetAll() {
+  if (confirm("Delete all results and start over?")) {
+    localStorage.removeItem('wsjfResults2025');
+    results = {};
+    currentItemIndex = -1;
+    renderTable();
+    document.getElementById('itemDisplay').textContent = "Click “Start / Next Item” to begin";
+    resetRound();
+  }
+}
+</script>
+</body>
+</html>
